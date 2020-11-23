@@ -1,0 +1,572 @@
+安裝
+
+DHCP => pfSense
+DNS Server => BIND
+load balancers => HAProxy
+HTTP Server => Apache/HTTPD
+
+Mirror Registry (NFS, Docker Distribution)
+
+
+Set up static IP configuration for an RHCOS node
+
+
+
+https://medium.com/@zhimin.wen/static-ip-for-ocp4-d2e4c1da5de
+
+https://github.com/openshift/okd/releases
+
+CentOS 8
+root / Rueilan0925
+admin / Rueilan0925
+
+
+DHCP
+
+
+vi /etc/sysconfig/network-scripts/ifcfg-enp0s8
+# 調整 ONBOOT=yes
+# 重新啟動
+
+
+sudo vim /etc/NetworkManager/NetworkManager.conf
+
+# And add this to the [main] section:
+dns=none
+
+systemctl restart NetworkManager
+
+
+sudo dnf install -y httpd
+
+
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDHA1rfuooBlFzElX2jQfJHx4Y+RxoLiKDu6AjZ1lAwj6jICao0wPBdFz3bd4OHbuWFoU7meFrGcjvnojdJfdVLKgZ5CKgTedN/ElENE3MwUvpRy2zpdjn2yCTTEe4LQMHXiRwSWdvLzoVJ9rtX0nzHCbh0Fz0Bsuosmz3M/BiwqGtkgFrfqoeEv6ezEN2FMwyKjRGgfdLaG5M6ix/ab4qvuXoktJ703j32uo5b32Bns8/YDq0i7nTskz7TQFPsJ67Aqc8LgF5cj+KEV48BiGMM62kfqKqNPKmDIHI2pxjTBQMtB4BJ0s+yYun/mOhNDD9ZDeY3u7NTbWn9vsptdYVWEZTi+U/2I9DccuraP5lxFeXhyOHUt7XUv1CCUET2DlPXkcyJJyoT9FSzKTHOkBPbN6SRX16YD/Q2stOU0G0oQjv/uEhe67oxPHzIm0uH6uVw4pCTyZgOEyizybtcK5Io73w1FuY7TKx1sxz7q2Gf4hA3mPDJNXZDc2xL6mHmXj8= admin@localhost.localdomain
+
+
+
+
+coreos.inst.install_dev=/dev/sda 
+coreos.inst.image_url=http://192.168.1.210:8080/okd4/fcos.raw.xz
+coreos.inst.ignition_url=http://192.168.1.210:8080/okd4/bootstrap.ign
+ip=192.168.1.200::192.168.1.254:255.255.255.0:okd4-bootstrap.lab.okd.local:enp0s3:none
+nameserver=192.168.1.210
+
+--
+
+coreos.inst.install_dev=/dev/sda 
+coreos.inst.image_url=http://192.168.1.210:8080/okd4/fcos.raw.xz 
+coreos.inst.ignition_url=http://192.168.1.210:8080/okd4/master.ign
+ip=192.168.1.201::192.168.1.254:255.255.255.0:okd4-control-plane-1.lab.okd.local:enp0s8:none 
+nameserver=192.168.1.210 
+
+coreos.inst.install_dev=/dev/sda 
+coreos.inst.image_url=http://192.168.1.210:8080/okd4/fcos.raw.xz 
+coreos.inst.ignition_url=http://192.168.1.210:8080/okd4/master.ign 
+ip=192.168.1.202::192.168.1.254:255.255.255.0:okd4-control-plane-2.lab.okd.local:enp0s8:none 
+nameserver=192.168.1.210
+
+coreos.inst.install_dev=/dev/sda 
+coreos.inst.image_url=http://192.168.1.210:8080/okd4/fcos.raw.xz 
+coreos.inst.ignition_url=http://192.168.1.210:8080/okd4/master.ign 
+ip=192.168.1.203::192.168.1.254:255.255.255.0:okd4-control-plane-3.lab.okd.local:enp0s8:none 
+nameserver=192.168.1.210 
+
+
+
+coreos.inst.install_dev=/dev/sda 
+coreos.inst.image_url=http://192.168.1.210:8080/okd4/fcos.raw.xz 
+coreos.inst.ignition_url=http://192.168.1.210:8080/okd4/worker.ign 
+ip=192.168.1.204::192.168.1.254:255.255.255.0:okd4-compute-1.lab.okd.local:enp0s8:none 
+nameserver=192.168.1.210 
+
+coreos.inst.install_dev=/dev/sda 
+coreos.inst.image_url=http://192.168.1.210:8080/okd4/fcos.raw.xz 
+coreos.inst.ignition_url=http://192.168.1.210:8080/okd4/worker.ign 
+ip=192.168.1.205::192.168.1.254:255.255.255.0:okd4-compute-2.lab.okd.local:enp0s3:none 
+nameserver=192.168.1.210 
+
+
+openshift-install gather bootstrap --bootstrap <bootstrap-host-ip> --master <control-plane-host-ip> [--master <control-plane-host-ip> ...]
+openshift-install gather bootstrap --bootstrap 192.168.1.200 --master 192.168.1.201 --master 192.168.1.202 --master 192.168.1.203
+
+
+
+其中 ip=... 的含義為 ip=$IPADDRESS::$DEFAULTGW:$NETMASK:$HOSTNAMEFQDN:$IFACE:none
+
+coreos.inst.install_dev=sda
+coreos.inst.image_url=http://192.168.57.60:8080/install/rhcos-4.4.3-x86_64-metal.x86_64.raw.gz
+coreos.inst.ignition_url=http://192.168.57.60:8080/ignition/bootstrap.ign
+ip=192.168.57.61::192.168.57.1:255.255.255.0:bootstrap.openshift4.example.com:ens192:none
+nameserver=192.168.57.60
+
+
+
+no route to host 是防火牆造成，關掉 okd-service 防火牆
+sudo systemctl stop firewalld
+sudo systemctl disable firewalld
+
+
+
+
+
+
+
+
+cd /var/www/html/okd4/
+sudo wget https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/32.20200824.3.0/x86_64/fedora-coreos-32.20200824.3.0-metal.x86_64.raw.xz
+sudo wget https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/32.20200824.3.0/x86_64/fedora-coreos-32.20200824.3.0-metal.x86_64.raw.xz.sig
+sudo mv fedora-coreos-32.20200824.3.0-metal.x86_64.raw.xz fcos.raw.xz
+sudo mv fedora-coreos-32.20200824.3.0-metal.x86_64.raw.xz.sig fcos.raw.xz.sig
+sudo chown -R apache: /var/www/html/
+sudo chmod -R 755 /var/www/html/
+
+
+安裝 Registry
+
+yum -y install podman httpd-tools
+mkdir -p /opt/registry/{auth,certs,data}
+
+cd /opt/registry/certs
+openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 365 -out domain.crt
+
+htpasswd -bBc /opt/registry/auth/htpasswd admin Rueilan0925
+
+
+podman run --name mirror-registry -p 5000:5000 \
+-v /opt/registry/data:/var/lib/registry:z \
+-v /opt/registry/auth:/auth:z \
+-e "REGISTRY_AUTH=htpasswd" \
+-e "REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm" \
+-e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd \
+-v /opt/registry/certs:/certs:z \
+-e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt \
+-e REGISTRY_HTTP_TLS_KEY=/certs/domain.key \
+-e REGISTRY_COMPATIBILITY_SCHEMA1_ENABLED=true \
+-d docker.io/library/registry:2
+
+firewall-cmd --add-port=5000/tcp --zone=internal --permanent
+firewall-cmd --add-port=5000/tcp --zone=public --permanent
+firewall-cmd --reload
+
+
+cp /opt/registry/certs/domain.crt /etc/pki/ca-trust/source/anchors/
+update-ca-trust
+
+curl -u admin:Rueilan0925 -k https://192.168.1.210:5000/v2/_catalog
+
+curl -u admin:Rueilan0925 -k https://192.168.1.210:5000/v1/repository/ocp4/openshift4/tag/
+
+export OCP_RELEASE=4.5.0-x86_64
+export LOCAL_REGISTRY='okd4-services.okd.local:5000'
+export LOCAL_REPOSITORY='ocp4/openshift4'
+export PRODUCT_REPO='openshift-release-dev'
+export LOCAL_SECRET_JSON='/home/admin/pull-secret.txt'
+export RELEASE_NAME="ocp-release"
+
+oc adm -a ${LOCAL_SECRET_JSON} release mirror \
+--from=quay.io/${PRODUCT_REPO}/${RELEASE_NAME}:${OCP_RELEASE} \
+--to=${LOCAL_REGISTRY}/${LOCAL_REPOSITORY} \
+--to-release-image=${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}:${OCP_RELEASE}
+
+
+oc adm release extract \
+-a ${LOCAL_SECRET_JSON} \
+--command=openshift-install \
+"${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}:${OCP_RELEASE}"
+
+
+首先找到OpenSSL工具配置文件openssl.cnf，对于Centos,目录在/etc/pki/tls/中
+
+编辑openssl.cnf,在[v3_ca]下面添加：subjectAltName = IP:域名|IP地址
+
+[ v3_ca ]
+subjectAltName = IP:172.10.15.110
+
+
+
+錯誤訊息：
+error pinging docker registry 127.0.0.1:5000: Get https://127.0.0.1:5000/v2/: x509: certificate is valid for 192.168.1.210, not 127.0.0.1
+
+解決方法：
+vi /etc/containers/registries.conf
+# 新增以下內容
+[[registry]]
+prefix = '192.168.1.210:5000'
+insecure = true
+location = "192.168.1.210:5000"
+
+---
+
+錯誤訊息：
+error authenticating creds for "192.168.1.210:5000": error creating new docker client: error loading registries: mixing sysregistry v1/v2 is not supported
+
+解決方法：
+vi /etc/containers/registries.conf
+
+# 刪除 v1 的格式
+# 範例 v1
+[registries.search]
+registries = ['registry.access.redhat.com', 'registry.fedoraproject.org', 'registry.centos.org', 'docker.io']
+
+[registries.insecure]
+registries = ['192.168.24.1:8787', 'localhost:8787', 'standalone.ctlplane.localdomain:8787']
+
+[registries.block]
+registries = []
+
+# 範例 v2
+[[registry]]
+prefix = "docker.io"
+insecure = true
+location = "docker.io"
+[[registry.mirror]]
+location = "192.168.0.127:5000"
+insecure = true
+
+[[registry]]
+prefix = '192.168.24.1:8787'
+insecure = true
+location = '192.168.24.1:8787'
+
+[[registry]]
+prefix = 'localhost:8787'
+insecure = true
+location = 'localhost:8787'
+
+[[registry]]
+prefix = 'standalone.ctlplane.localdomain:8787'
+insecure = true
+location = 'standalone.ctlplane.localdomain:8787'
+
+
+[[registry]]
+prefix = '10.95.28.159:8083'
+insecure = true
+location = '10.95.28.159:8083'
+
+---
+
+登入並取得 pull secret
+podman login --authfile ~/pullsecret_config.json bastion.lab.okd.local:5000
+
+
+下载 pull-secure 文件，并重命名为 pullsecret_config.json
+
+https://cloud.redhat.com/openshift/install/pull-secret
+
+cp pull-secret pullsecret_config.json
+
+# podman login --authfile ~/pullsecret_config.json repo.apps.weixinyucluster.bluecat.ltd:5000
+
+登录成功以后，pullsecret_config.json 这个文件就同时包含红帽仓库和mirror registry的pull secret了。
+
+
+
+
+sudo wget https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/32.20200907.3.0/x86_64/fedora-coreos-32.20200907.3.0-metal.x86_64.raw.xz
+sudo wget https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/32.20200907.3.0/x86_64/fedora-coreos-32.20200907.3.0-metal.x86_64.raw.xz.sig
+
+sudo mv fedora-coreos-32.20200907.3.0-metal.x86_64.raw.xz fcos.raw.xz
+sudo mv fedora-coreos-32.20200907.3.0-metal.x86_64.raw.xz.sig fcos.raw.xz.sig
+
+sudo chown -R apache: /var/www/html/
+sudo chmod -R 755 /var/www/html/
+
+
+podman pull 192.168.1.210:5000/ocp4/openshift4/ocp-release:4.5.0-x86_64
+
+podman pull bastion.lab.okd.local:5000/ocp4/openshift4/ocp-release:4.5.0-x86_64
+podman pull bastion.lab.okd.local:5000/ocp4/openshift4:4.5.0-x86_64
+
+
+
+
+curl -LO https://github.com/openshift/okd/releases/download/4.5.0-0.okd-2020-10-03-012432/openshift-client-linux-4.5.0-0.okd-2020-10-03-012432.tar.gz
+
+
+=========================================================================================================================================================================
+
+# Install CentOS 8
+
+# 1.設定IP
+sudo nmtui
+
+systemctl restart NetworkManager.service
+ifdown enp0s8
+ifup enp0s8
+
+# 2.安裝必要軟體
+sudo dnf install -y vim podman httpd dnsmasq dnsmasq-utils jq telnet
+
+# 加外部 DNS
+sudo vi /etc/dnsmasq.conf
+# 新增：server=8.8.8.8
+
+sudo vi /etc/hosts
+
+192.168.1.210 bastion.lab.okd.local
+192.168.1.211 bootstrap.lab.okd.local api.lab.okd.local api-int.lab.okd.local
+192.168.1.212 master.lab.okd.local
+192.168.1.213 worker.lab.okd.local console-openshift-console.lab.okd.local oauth-openshift.lab.okd.local
+
+sudo systemctl enable dnsmasq
+sudo systemctl start dnsmasq
+sudo firewall-cmd --add-service=dns --permanent
+sudo firewall-cmd --reload
+
+# 設定 DNS 到自己的服務
+sudo nmtui
+
+sudo mkdir -p /opt/registry/{auth,certs,data}
+
+cd /opt/registry/certs
+sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 365 -out domain.crt
+
+sudo htpasswd -bBc /opt/registry/auth/htpasswd admin Rueilan0925
+
+# 調整擁有者
+sudo chown -R admin:admin /opt/registry/
+
+podman run --name mirror-registry -p 5000:5000 \
+-v /opt/registry/data:/var/lib/registry:z \
+-v /opt/registry/auth:/auth:z \
+-e "REGISTRY_AUTH=htpasswd" \
+-e "REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm" \
+-e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd \
+-v /opt/registry/certs:/certs:z \
+-e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt \
+-e REGISTRY_HTTP_TLS_KEY=/certs/domain.key \
+-e REGISTRY_COMPATIBILITY_SCHEMA1_ENABLED=true \
+-d docker.io/library/registry:2
+
+curl -u admin:Rueilan0925 -k https://bastion.lab.okd.local:5000/v2/_catalog
+
+sudo firewall-cmd --add-port=5000/tcp --zone=internal --permanent
+sudo firewall-cmd --add-port=5000/tcp --zone=public --permanent
+sudo firewall-cmd --reload
+
+# 加入 Registry 的 Certificate（需使用root）
+sudo cp /opt/registry/certs/domain.crt /etc/pki/ca-trust/source/anchors/
+sudo update-ca-trust
+
+# download pull-secret.json
+https://cloud.redhat.com/openshift/install/pull-secret
+
+# 將下載的 pull-secret 加上 Private Registry 的帳密
+podman login --authfile ~/pull-secret.json bastion.lab.okd.local:5000
+
+# 下載 OKD 的 CLI（不要下載到 Openshift 版本）
+curl -LO https://github.com/openshift/okd/releases/download/4.5.0-0.okd-2020-10-03-012432/openshift-client-linux-4.5.0-0.okd-2020-10-03-012432.tar.gz
+curl -LO https://github.com/openshift/okd/releases/download/4.5.0-0.okd-2020-10-03-012432/openshift-install-linux-4.5.0-0.okd-2020-10-03-012432.tar.gz
+
+tar xzvf openshift-client-linux.tar.gz
+sudo mv kubectl /usr/local/bin
+sudo mv oc /usr/local/bin
+
+
+https://quay.io/repository/openshift-release-dev/ocp-release?tab=tags
+
+export OCP_RELEASE=4.5.0-0.okd-2020-10-03-012432
+export LOCAL_REGISTRY='bastion.lab.okd.local:5000'
+export LOCAL_REPOSITORY='okd4/okd45'
+export PRODUCT_REPO='openshift'
+export LOCAL_SECRET_JSON='/home/admin/pull-secret.json'
+export RELEASE_NAME="okd"
+
+oc adm -a ${LOCAL_SECRET_JSON} release mirror \
+--from=quay.io/${PRODUCT_REPO}/${RELEASE_NAME}:${OCP_RELEASE} \
+--to=${LOCAL_REGISTRY}/${LOCAL_REPOSITORY} \
+--to-release-image=${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}:${OCP_RELEASE}
+
+curl -X GET -u admin:Rueilan0925 -k https://bastion.lab.okd.local:5000/v2/okd4/okd45/tags/list | jq .
+
+# COPY
+
+imageContentSources:
+- mirrors:
+  - bastion.lab.okd.local:5000/okd4/okd45
+  source: quay.io/openshift/okd
+- mirrors:
+  - bastion.lab.okd.local:5000/okd4/okd45
+  source: quay.io/openshift/okd-content
+
+
+oc adm release extract \
+-a ${LOCAL_SECRET_JSON} \
+--command=openshift-install \
+"${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}:${OCP_RELEASE}"
+
+
+# 產生 install-config.yaml
+ssh-keygen
+
+apiVersion: v1
+baseDomain: okd.local
+compute:
+- hyperthreading: Enabled
+  name: worker
+  replicas: 0
+controlPlane:
+  hyperthreading: Enabled
+  name: master
+  replicas: 3
+metadata:
+  name: lab
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  networkType: OpenShiftSDN
+  serviceNetwork:
+  - 172.30.0.0/16
+platform:
+  none: {}
+fips: false
+pullSecret: '{"auths": {"bastion.lab.okd.local:5000": {"auth": "YWRtaW46UnVlaWxhbjA5MjU="}}}'
+sshKey: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCTxHxvkWRDIOk7v7/t8ODGXRDPVhxcsNTeX1TcjqqD+kqWy0tj812UgI3TLLq9HUlo05cfZ3tHNPqyzWlEj8Edv4JYV5SpygXt3EwZoyABd1LNnmwvMvUHojabIGInznXoA6itK0eMfZhdCzaG/TxadnqPX7nzd9Q3dGZGUq+88EhKg9XTsFp2QLyxL34aNmx2zaWE8jLLABZLZIxrQmjSEwlulqmN2wH146CTnTTvE10V111/QtSYizuWgpA4ZrSqpQdOidrVOy+czvy99qYhJlnstkobvOGqsG6WT/DnVG7hrUM7JW5LfbcEWwLqDOUSwUyKnLIT4Ov5KvGIs6clRPYK17gFpwhdtO0V8G033fcjF5gIIYoIPwgZw1t4q+S9TWla1BlWQQxV3yO+ZeWEViXX2xjCaqiChg7x7ji/TYrugnpXU5N5bYWZxl1uowgt4TlTx8esnsTwMGOQYnGis3K4INkxwt/sr4gwC/SHnLm5eNrsPLVtF6fQWXYPxS8= admin@bastion.lab.okd.local'
+additionalTrustBundle: |
+  -----BEGIN CERTIFICATE-----
+  MIIF7TCCA9WgAwIBAgIUeMjt92olvm4j8up1maFEiL8Sro4wDQYJKoZIhvcNAQEL
+  BQAwgYUxCzAJBgNVBAYTAlRXMQ8wDQYDVQQIDAZUYWlwZWkxDzANBgNVBAcMBlRh
+  aXBlaTETMBEGA1UECgwKQ2F0aGF5bGlmZTEeMBwGA1UEAwwVYmFzdGlvbi5sYWIu
+  b2tkLmxvY2FsMR8wHQYJKoZIhvcNAQkBFhB5YW4zMjRAZ21haWwuY29tMB4XDTIw
+  MTEyMjA0NTc0NloXDTIxMTEyMjA0NTc0NlowgYUxCzAJBgNVBAYTAlRXMQ8wDQYD
+  VQQIDAZUYWlwZWkxDzANBgNVBAcMBlRhaXBlaTETMBEGA1UECgwKQ2F0aGF5bGlm
+  ZTEeMBwGA1UEAwwVYmFzdGlvbi5sYWIub2tkLmxvY2FsMR8wHQYJKoZIhvcNAQkB
+  FhB5YW4zMjRAZ21haWwuY29tMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKC
+  AgEAvvS+6ULIhxrUBf/fie0Wu2aRQ0ZqVBRX8NeY1F5kiV4EmBZTls8qO2eB9bvg
+  NoReIlgRu9PNDTL/VIwDNAhu+foN42rkb9rvuEWYJL/hiAIrUuJtsROHMKxER0Ua
+  boTyDzju2vPZLfYBVLlcOGSD4EhcEkUhLKBxnXrvyv6nbF36OuRyJojIIY7+Q81e
+  AmU9vH+4SMEa96cok8yjYoUuH2//StN2WpFApTJszS3TH0k3JD+x8ToVPeHzXm/H
+  GzCGR0cTHG/kzKhVEX3nWuZd89VJptDpT4xvj5YYEeb+Ndi3CAnsP+nQB7UFY0RL
+  /9erLCpM4wUOfxrcV2WfgnhVt1NbqWYymlPl4rHt1B8IOKsP8FTm1KeMfhSzxpB8
+  h0EvE25iMi1j+JKMDWgJoSPecRKdBPvLaqS60zkL7YeyKkCV4QBJrMUDDMCJGR34
+  Q4i49PSS7ZQ+xAKTL/aU9uI943+tvso6E+6cjurBxmA2Nqdp0Y5jrSG9cbJssmOA
+  0wgsqDcM2NXXKakYciJq1GGwg2Bu14fm47aNYM2I5WsX9vuHywwS1EetNPDOkYKV
+  LzSeOpCK5tYs8wFxXJwRF+DRVCh1mkr6m57Kob59VTgAa9hEKnMR0O4DiSWk+jH5
+  NF+6WA6OvjDtB6WA/eINAZ3x3qyYxK4gJEHLrEZu3p9Ii2UCAwEAAaNTMFEwHQYD
+  VR0OBBYEFBALDNW9ncVHBh7W96vCuVqAxOYDMB8GA1UdIwQYMBaAFBALDNW9ncVH
+  Bh7W96vCuVqAxOYDMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggIB
+  AACx3osWY5YNZod4Q4GkUfdk/d3wBaOKde5u9dgbIR9v6uM0PjBWSuRglVHMbe0J
+  rXb4BE4g3rTCshT8xtyu5PaEjoyO5poN8Ope36heR425S1zd72tAc9fyfZr4lz/H
+  X/nAw198skCD+8DXrgkTDUcgDeS/DB4QfGFpv6pC/kdS5e8IePSNtL2NJs5BBYnP
+  54esnnVv2mwN/rcfyeiZaJ+QDrMd7uilDOteT49KG5AThj6mYY5+qJyfQ5UJebwt
+  Z5g6jY8G3HmlVdyi69T1n4Xhmi0xWgghAcDOQjVeZFA1pdFqwiL10o+FT/SHdGDO
+  SALpxm2ICebmhxkGsFjVcZYz5cX+Bemwif7Q34jyG+yF/MCmHCKDmoGRRsy+0xjt
+  CxX6IQorNMrAH+bEr9RZnKzVgWe7f4GwynoUfGdEOc5eWk0npP6J5jDq8sv4+JeD
+  uyVSsREoI7NI4OaVqRRL7lj85GpbaCmz+Vr1AkIZeumyUzv4BMlEqngVXQzvH1rA
+  OvwjiH+aG9RsJAOV2UMGW55nBVG4OL1P1ATWc08g6DfYeC1Dz95qSy6lrdclunay
+  DCdQImSN6q1h6FSisVFLEktKAw5qLZydcu6Gbk5pVND9twAB+f27Hcuc0Q24CWx3
+  W2jg/DapRhHOYmWAMg8HvXog4PD0QlBwIfoliraNUkfj
+  -----END CERTIFICATE-----
+imageContentSources:
+- mirrors:
+  - bastion.lab.okd.local:5000/okd4/okd45
+  source: quay.io/openshift/okd
+- mirrors:
+  - bastion.lab.okd.local:5000/okd4/okd45
+  source: quay.io/openshift/okd-content
+
+
+openshift-install create manifests --dir=install_dir/
+
+openshift-install create ignition-configs --dir=install_dir/
+
+
+sudo systemctl status httpd
+
+sudo mkdir /var/www/html/okd4
+sudo cp -R install_dir/* /var/www/html/okd4/
+sudo chown -R apache: /var/www/html/
+sudo chmod -R 755 /var/www/html/
+
+sudo setsebool -P httpd_read_user_content 1
+sudo systemctl enable httpd
+sudo systemctl start httpd
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --reload
+
+curl bastion.lab.okd.local/okd4/metadata.json
+
+
+podman run --pull=always --rm -i quay.io/coreos/ignition-validate:v2.2.0 - < bootstrap.ign
+
+---
+
+VirtualBox 安裝 coreos 時要選 Linux / Other Linux (64 Bit)
+
+sudo nmtui
+
+curl -LO http://bastion.lab.okd.local/okd4/bootstrap.ign
+coreos-installer install /dev/sda --firstboot-args=console=foo -n -i bootstrap.ign
+
+
+---
+
+# Bootstrap Node
+journalctl -b -f -u kubelet.service
+journalctl -b -f -u bootkube.service
+
+openshift-install --dir=install_dir wait-for bootstrap-complete --log-level=debug
+
+
+openshift-install gather bootstrap --dir=./install_dir --bootstrap=bootstrap.lab.okd.local --master=master.lab.okd.local
+
+
+oc --kubeconfig=./kubeconfig adm must-gather --image=bastion.lab.okd.local:5000/okd4/okd45@sha256:ae9949b075844ccaeb149dd0a33ad380976762e5cdeb4735d99063c2a2178401
+oc --kubeconfig=./kubeconfig get events -n openshift-must-gather-scpm5
+---
+
+OpenShift 版本
+https://openshift-release.svc.ci.openshift.org/
+
+現有版本 Life Cycle Dates
+https://access.redhat.com/support/policy/updates/openshift/
+
+OCP 現有版本的描述 4.y.z （例如4.6.1）
+y 版本通常一季一次，且會寫在 roadmap 中
+每一個 y 版本都會對應一個新的 K8S 版本
+Ex: 4.6 是 K8S 1.19
+    4.5 是 K8S 1.18
+z 版本通常一週發佈一次
+
+參考文件：https://my.oschina.net/u/4567873/blog/4697460
+
+OKD 版本
+https://origin-release.apps.ci.l2s4.p1.openshiftapps.com/
+https://github.com/openshift/okd/releases
+
+
+
+升級 --
+
+  973  oc get clusterloggings.logging.openshift.io
+  974  oc get clusteroperators.config.openshift.io -A
+  975  oc get cvo
+  976  oc get clusterversions.config.openshift.io
+  977  oc edit clusterversions.config.openshift.io version
+  978  oc edit clusterversions.config.openshift.io version
+  979  oc get clusteroperator authentication -o yaml
+  980  oc create secret tls custom-wildcard-new1      --cert=wildcard.crt      --key=wildcard.key      -n openshift-config
+  981  oc create configmap custom-wildcard-new1      --from-file=ca-bundle.crt=wildcard.crt      -n openshift-config
+  982  oc patch proxy/cluster      --type=merge      --patch='{"spec":{"trustedCA":{"name":"custom-wildcard-new1"}}}'
+  983  oc create secret tls custom-wildcard-new1      --cert=wildcard.crt      --key=wildcard.key      -n openshift-ingress
+  984  oc patch ingresscontroller.operator default      --type=merge -p      '{"spec":{"defaultCertificate": {"name": "custom-wildcard-new1"}}}'      -n openshift-ingress-operator
+  985  watch oc get node
+  986  oc get machineconfigpool
+  987  oc adm release info
+  988  podman login cxlokdbnt01.okdpaas.cathaylife.com.tw:5000
+  989  oc adm upgrade --helo
+  990  oc adm upgrade --help
+  991  oc adm upgrade --allow-explicit-upgrade --to-image ${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}@sha256:67cc7cb47d56237adcf0ecc2ee76446785add5fa236cd08746b55f578b9200a5 --force=true
+  992  LOCAL_REGISTRY='cxlokdbnt01.okdpaas.cathaylife.com.tw:5000'
+  993  LOCAL_REPOSITORY='okd4/okd46'
+  994  oc adm upgrade --allow-explicit-upgrade --to-image ${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}@sha256:67cc7cb47d56237adcf0ecc2ee76446785add5fa236cd08746b55f578b9200a5 --force=true
+  995  oc adm upgrade --allow-explicit-upgrade --to-image ${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}@sha256:67cc7cb47d56237adcf0ecc2ee76446785add5fa236cd08746b55f578b9200a5 --force=true --allow-upgrade-with-warnings
+  996  oc get clusterversion
+  997  watch oc get clusterversion
+  998  oc adm upgrade --help
+  999  oc get pod
+ 1000  oc logs oauth-openshift-5c94b8f546-qfv6g
