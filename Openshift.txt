@@ -1,5 +1,14 @@
 使用此文章的 DNS、HAProxy 可安裝完成 https://medium.com/swlh/guide-okd-4-5-single-node-cluster-832693cb752b
 
+VMWare Fusion
+  /Library/Preferences/VMware Fusion/vmnet8/dhcpd.conf
+    ip range: 192.168.104.128 ~ 192.168.104.254
+    gateway: 192.168.104.2
+
+bastion: 192.168.104.130
+master: 192.168.104.131
+bootstrap: 192.168.104.132
+
 # Install CentOS 8
 
 # 1.設定IP
@@ -18,10 +27,10 @@ sudo vi /etc/dnsmasq.conf
 
 sudo vi /etc/hosts
 
-192.168.1.210 bastion.lab.okd.local
-192.168.1.211 bootstrap.lab.okd.local api.lab.okd.local api-int.lab.okd.local
-192.168.1.212 master.lab.okd.local
-192.168.1.213 worker.lab.okd.local console-openshift-console.lab.okd.local oauth-openshift.lab.okd.local
+192.168.104.130 bastion.okd.local
+192.168.104.131 bootstrap.lab.okd.local api.lab.okd.local api-int.lab.okd.local
+192.168.104.132 master.lab.okd.local
+# 192.168.104.131 worker.lab.okd.local console-openshift-console.lab.okd.local oauth-openshift.lab.okd.local
 
 sudo systemctl enable dnsmasq
 sudo systemctl start dnsmasq
@@ -34,7 +43,7 @@ sudo nmtui
 sudo mkdir -p /opt/registry/{auth,certs,data}
 
 cd /opt/registry/certs
-sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 365 -out domain.crt
+sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 36500 -out domain.crt
 
 sudo htpasswd -bBc /opt/registry/auth/htpasswd admin Rueilan0925
 
@@ -53,7 +62,7 @@ podman run --name mirror-registry -p 5000:5000 \
 -e REGISTRY_COMPATIBILITY_SCHEMA1_ENABLED=true \
 -d docker.io/library/registry:2
 
-curl -u admin:Rueilan0925 -k https://bastion.lab.okd.local:5000/v2/_catalog
+curl -u admin:Rueilan0925 -k https://bastion.okd.local:5000/v2/_catalog
 curl -u admin:Rueilan0925 -k https://okd4-services.okd.local:5000/v2/_catalog
 
 sudo firewall-cmd --add-port=5000/tcp --zone=internal --permanent
@@ -68,9 +77,12 @@ sudo update-ca-trust
 https://cloud.redhat.com/openshift/install/pull-secret
 
 # 將下載的 pull-secret 加上 Private Registry 的帳密
-podman login --authfile ~/pull-secret.json bastion.lab.okd.local:5000
+podman login --authfile ~/pull-secret.json bastion.okd.local:5000
 
 # 下載 OKD 的 CLI（不要下載到 Openshift 版本）
+curl -LO https://github.com/openshift/okd/releases/download/4.6.0-0.okd-2020-11-27-200126/openshift-client-linux-4.6.0-0.okd-2020-11-27-200126.tar.gz
+
+curl -LO https://github.com/openshift/okd/releases/download/4.5.0-0.okd-2020-10-15-235428/openshift-client-linux-4.5.0-0.okd-2020-10-15-235428.tar.gz
 curl -LO https://github.com/openshift/okd/releases/download/4.5.0-0.okd-2020-10-03-012432/openshift-client-linux-4.5.0-0.okd-2020-10-03-012432.tar.gz
 curl -LO https://github.com/openshift/okd/releases/download/4.5.0-0.okd-2020-10-03-012432/openshift-install-linux-4.5.0-0.okd-2020-10-03-012432.tar.gz
 
@@ -81,8 +93,8 @@ sudo mv oc /usr/local/bin
 
 https://quay.io/repository/openshift-release-dev/ocp-release?tab=tags
 
-export OCP_RELEASE=4.5.0-0.okd-2020-10-03-012432
-export LOCAL_REGISTRY='okd4-services.okd.local:5000'
+export OCP_RELEASE=4.5.0-0.okd-2020-10-15-235428
+export LOCAL_REGISTRY='bastion.okd.local:5000'
 export LOCAL_REPOSITORY='okd4/okd45'
 export PRODUCT_REPO='openshift'
 export LOCAL_SECRET_JSON='/home/admin/pull-secret.json'
@@ -93,16 +105,16 @@ oc adm -a ${LOCAL_SECRET_JSON} release mirror \
 --to=${LOCAL_REGISTRY}/${LOCAL_REPOSITORY} \
 --to-release-image=${LOCAL_REGISTRY}/${LOCAL_REPOSITORY}:${OCP_RELEASE}
 
-curl -X GET -u admin:Rueilan0925 -k https://okd4-services.okd.local:5000/v2/okd4/okd45/tags/list | jq .
+curl -X GET -u admin:Rueilan0925 -k https://bastion.okd.local:5000/v2/okd4/okd45/tags/list | jq .
 
 # COPY
 
 imageContentSources:
 - mirrors:
-  - okd4-services.okd.local:5000/okd4/okd45
+  - bastion.okd.local:5000/okd4/okd45
   source: quay.io/openshift/okd
 - mirrors:
-  - okd4-services.okd.local:5000/okd4/okd45
+  - bastion.okd.local:5000/okd4/okd45
   source: quay.io/openshift/okd-content
 
 
@@ -142,53 +154,56 @@ platform:
   none: {}
 
 fips: false
-pullSecret: '{"auths": {"okd4-services.okd.local:5000": {"auth": "YWRtaW46UnVlaWxhbjA5MjU="}}}'
-sshKey: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC+gXgYkvhlSbljsntn+71VmxUWz9Rzea9tb/LWuxZc1Elh8xdvJuOKqcVV+SJyVleEHsTXdvnRqU/u+wGn9pUY47sTQ4/omC3Dc7oHtHbFm7rh9CQ1tMtprDDdhCg6WatB3gHKgXNSFHIU2pWxEVHuhdUjhWVkCsP47wFqTivdvnDb+raNuqat2c0Jm9sj4ZSdeJuTN7JtyIixUoM5vSEtZeo0Zl1feu0I+/LBAzdhZj9ld76rcKdI103sODisnl4dXLXFdOC/hpRm4BkK4wCJJbJMHtXGoh/D8nKl2CA7yd31/5TU4pHJhqXk9NZj8irSuNw5ayTB+PAw9UHTgb1Imk8d+IESbSs1bu22DOevYOKRi1SbGCaY02bMeMS7oEv563U2A7Y9sxLquwNNjCrrrdY1VYiEmJMWe3xTdWilDOj3upDiRnoWzDIzRTw/TmHF8SCyK0HngSnl4YVObtqWp+YQgZfw8ldM2YtBYyjxP3mictMVcGvF8AK7sexj2QEPKcr0ufVDsIsdoqLjY9lRUMQEKT14GnGtqJEVvE6R1rCYMithMscSye7wBtM0pSd3aOC/i8lxVImvnjRlIooZFeJvwS6GDqUhh4oRnqLDwZihbH2dFEuBZe+2wLJjeylVlWkgIA1hPjAXbcWZ8jutGxgMr7251RBsknRkW5Skew== admin@okd4-services.okd.local'
+pullSecret: '{"auths": {"bastion.okd.local:5000": {"auth": "YWRtaW46UnVlaWxhbjA5MjU="}}}'
+sshKey: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCafdF+aXCI0I3Pw9T29BwR+ajMoLzp9G2i/bWJomaTSrOSd5lX3VbOfDhNQtyG47ZvWwlshlsHNHSPMEgebsVr6BwEpPbn6aYDGcfb4spNWThs7vpAdSTsGLyYPYnqH8SUdxS799bJadmVY345KNC3E597pOwZbZZ2txulzHYi+O0unphkOpSB85Tmv310ijDGyQPZOiNr5TwxQ9OPOyfX6nRqWavpGaQAY0WLNCXxY1SuBStb+fchYlSz6DTSZPaHKWqVb1AlkwpbIa9kAw6vKXMcAZPDLR2riUuXC26CgSZ3Br1EvzN5Iol+v1ZKH1vW+ibW41yhRSxrFLpKwFA1DIPZ/CTL4pGMBcUtxFYOfOzrlZQg/+JAD4Hs/qL5N8KFNopbeZPNXjYneDCyyo+eRgmmUb55HF3mBq5s5sqIpVh6gxJRpKH5ALBSOC1L2P2Xs9fFhxeLbwZC56cy8Jtqb/onhHTr1Ui4GnyUSqDUD+K4g+y9Y/hkvqQSMpacDOcp64jt73WO0t9GYFGRJrjRoZGxSmaHtX4oBFbDOFRmcu9Wq26zMGXy1OpCGFghajJWKsz5Hhl+kYF39CX83ujyF3O0IdMNoyEaUG1pf+761nCtoPuzj8JRTte9o4OIYQdN3/pGkc3KwiF6sgNqyc726EWSk2d37/2bcu7CUUwJkw== admin@bastion.okd.local'
 additionalTrustBundle: |
   -----BEGIN CERTIFICATE-----
-  MIIF+TCCA+GgAwIBAgIUIcZpnf9VuCfGKWeALPWCnNgkpbEwDQYJKoZIhvcNAQEL
-  BQAwgYsxCzAJBgNVBAYTAlRXMRMwEQYDVQQIDApDYXRoYXlsaWZlMQ8wDQYDVQQH
-  DAZUYWlwZWkxEzARBgNVBAoMCkNhdGhheWxpZmUxIDAeBgNVBAMMF29rZDQtc2Vy
-  dmljZXMub2tkLmxvY2FsMR8wHQYJKoZIhvcNAQkBFhB5YW4zMjRAZ21haWwuY29t
-  MB4XDTIwMTEyNDAwMjMyMVoXDTIxMTEyNDAwMjMyMVowgYsxCzAJBgNVBAYTAlRX
-  MRMwEQYDVQQIDApDYXRoYXlsaWZlMQ8wDQYDVQQHDAZUYWlwZWkxEzARBgNVBAoM
-  CkNhdGhheWxpZmUxIDAeBgNVBAMMF29rZDQtc2VydmljZXMub2tkLmxvY2FsMR8w
-  HQYJKoZIhvcNAQkBFhB5YW4zMjRAZ21haWwuY29tMIICIjANBgkqhkiG9w0BAQEF
-  AAOCAg8AMIICCgKCAgEApbQ5GdbfnPWNnhkAKjOtgT0mzA0krmU2XkqBqun0N2eM
-  jE4q3D16XDqmIig4VJ4T9EkhCTfyZT0I7qBIiyLmpiFz/MWzS6F4huycqfsKMaod
-  4quBvNd9lUGKKlkRSe2Iu5Rr2wgI86pSRfRJSG8AUTaMCtSiSvUBbapQrOm/AvQX
-  QMAtlbxC/AmCDaQnuRgwROFPq774Cd/66EQGM0n6OrgWgELmstEps54qTwXeE3cq
-  4fTgFHJGavY8+/MQMt85jAy3jcsEZavdzMaYXPFmadMzATt8z6eL/P+/I0JDFiXK
-  Kj0ziOR7lpn7FojvavqIze89ok6aSNpPTS/grbjIv7ErZ94PU4eDKHiZB5Ly0JX+
-  yzGrfVfV6z6NkWuOn7pQ32KRrs/mkCUn6nNzTdkxav2lxGIic7kt3sy0RNBC5Icx
-  1nssL0ZCsG5/ZMqsLDcRN1c+FzYD0Ge8fdGvSFD5TBWvarH4IMbjr6R94tdQNFdz
-  7c/+AOJ7f5zw/4fL9wHtwbeGhUJwPYbwBvaRE6wtpGh5HPnEM+5LAmM8uFAAL8la
-  uSpd+H/kGWI9/yhsuH3QJodj9l3m0MbRBT/P1E2GJVLGpd3gmT0TtUnH4QVCjwCx
-  E+HtlHx9cpiHok8yvnRyF+zTTtJei1v81ub7vGDTmiEvhDJ9OAKAvap+u/zDHJ0C
-  AwEAAaNTMFEwHQYDVR0OBBYEFEeUmMmOjXmwJzCHtIrsbZubQHShMB8GA1UdIwQY
-  MBaAFEeUmMmOjXmwJzCHtIrsbZubQHShMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZI
-  hvcNAQELBQADggIBAJEd0ol7hr6w3L5u38Q+ZioGS+Qrdv8E5Unw/oQuFq9G0s64
-  z0cfvSxbJVhxO+2uAgSMJDVQQEn0P17K3rafWAHR78Csha8HVfFXlY+yoTVSEnLT
-  bYHX9ca63uRs01gfJQSk0xlKQJlmmNNAhkr8CYS6dquow0/r47XB7PnhlYNc3cKA
-  /6CD76Wb/SgC2QQ7uwZ+gCbmTtntFlna893QpoblPbYU+wu8VoAiVyCoAJnTT18x
-  0xrHeNjXg1xFr8iJpwaQ+2cnp8VPPkwkQDoHldgSjaPv6j/sUKZ0XUJary1WruHk
-  M59kqIq8hUElT0cr6qA9or2cbYbweHkNjZZ8wbA8NFQrqWKGIcon/66Eg6wgxpyI
-  9IKSQe5FuCFEhChD21Q19AdxBHGTRSJH9m/YCZM54wzG7+pgADD7O7WF0Jp5zKmV
-  7FS6YjoFdl9q9dNLCeK3ZboEuLgyymYHGw7GRMGWiVP/TPoEgCzCfIlJ6pMny4Z0
-  tQTA9OSe9a2cX1xGVBgHQRVDB6hbSzvGYaBySfphXTJ4TgzL86T+dPsU7k+1/ueD
-  ODOesEHurgD+xyDzqgnYYzmj6QCPwtXjwXE0JuExjfwoboI6Cq2dj3QWLY94OxlP
-  BFR2nZnWNdn1wOuS4+xdtioVBxehhkLkEyXnGNvlvAoH2x9sMbqDXi84aL4i
+  MIIF9zCCA9+gAwIBAgIUaqrTs8SljZl5MlGvz07wpHHEhq0wDQYJKoZIhvcNAQEL
+  BQAwgYkxCzAJBgNVBAYTAlRXMQ8wDQYDVQQIDAZUYWl3YW4xDzANBgNVBAcMBlRh
+  aXBlaTETMBEGA1UECgwKQ2F0aGF5bGlmZTEaMBgGA1UEAwwRYmFzdGlvbi5va2Qu
+  bG9jYWwxJzAlBgkqhkiG9w0BCQEWGGppbnlhbkBjYXRoYXlsaWZlLmNvbS50dzAg
+  Fw0yMDExMjkwNjAyMDNaGA8yMTIwMTEwNTA2MDIwM1owgYkxCzAJBgNVBAYTAlRX
+  MQ8wDQYDVQQIDAZUYWl3YW4xDzANBgNVBAcMBlRhaXBlaTETMBEGA1UECgwKQ2F0
+  aGF5bGlmZTEaMBgGA1UEAwwRYmFzdGlvbi5va2QubG9jYWwxJzAlBgkqhkiG9w0B
+  CQEWGGppbnlhbkBjYXRoYXlsaWZlLmNvbS50dzCCAiIwDQYJKoZIhvcNAQEBBQAD
+  ggIPADCCAgoCggIBAKhrqDV0WVh8QuQ9WzkrbsOfpBLssjVT/72xs+rCr0Esci3R
+  bgwOycNxZ1gGbLNpYzoliL++miNSV4vNbLldGSfFRBdWIzpYvTGZ8WQTXATypfch
+  K1QRYjSOmoATeIs2WnhGV5MU4i9EOhs/UksGLDXPJ6o9Q0+tszpZ1AZL5nvzlk/u
+  lmkOD9xZIpYDRd0WTtchhLTwL9Ywayp3veLWfmbV/o8l3NBbBhJGT576Ik9Cx47l
+  99HNnCi7r7/71jwEwj/dgVl0XrBhqYtoWM3+N0J2JfueVdKs74AlT/CIL/2qHlFm
+  s50AB/+edYyqJ5TkB3OfirI49yYhGRp5F4fP43Ar2Gu06lXdyh660otaV1Oiufqr
+  DPfkF+bTwJBWGcDZ52VfKPN9uM03nI7p9c0SRDNm3WwO4rBKK2tqJ8gCFGIFHRcE
+  x4u/8NrClpW3eiXPz3GhXSsgNQYtM15CNtk5WKfjT0TprADPrkYLY83++P5gxYd9
+  jbR6lsWI/EA2g9tPvqY3pjiYkFAaxfDYxCazX90m8vYI5kHzEhOPKG6GdIi/vyHx
+  UOr8Sjz/rNQ3XdE/c47vHa4ndHO53muo5gIQzi92+N3ONJV/OZvv0+tFhtMSFTH+
+  zNYcnUfZ2iEhSoQBPFykgWJyAT/qdABuQlLlAx7aXhkDZfNhmMQXc0xzoZHBAgMB
+  AAGjUzBRMB0GA1UdDgQWBBTjGIhzliTtAl0Bf/C6rwxah4aX3TAfBgNVHSMEGDAW
+  gBTjGIhzliTtAl0Bf/C6rwxah4aX3TAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3
+  DQEBCwUAA4ICAQCLVfyL2l9RpqncGogmrI/2XCNamThqlikPViwUCRapqWW3d4SJ
+  1BelCqTq+fDRLruHXpP5KgBKRyx8Dgct5D3DNuWEc4Hv1C1ZQffSBh8NLc6vSTbS
+  p9TONMrmX8/oimNFLlpSLdk948n7hAOPOrKRP/4O7JuPpz9+cTmBAZibhZDlIQcv
+  j+jGiNtdcf+vwgbhl4JeZWl3WbhlCPVpFTQemdrfbSEMnShQE5LF6RJwIIAxDCj9
+  cd/JsHJ7dxylESvnZj1SunfrTQ9hZaHYDP9idqvau8Sb3F+o8e8pgl4IHPeUBpJz
+  lcoPnB99CoTIerkYFE3JRhIP/1dd5hCOloaB+7AXK9jzNa30xqRgRZxIK7E1UeDb
+  EYet3oVjnXnZewx94q/eytZ6NqpWRummCsOkiGadGmYf/+WtVjyCCyeZhZS0KAGy
+  lsawojrXox5D1MWJCWuWhLHVm7mpfPOzG1d3XapdvbL/ikjHsbH37MhhILTXUwLe
+  OdPQEWNepnbN8+aeE5lBrt4wSh4PgRdo02S63Qj0eVYlvmYm3un033sn+zzve3IH
+  Suh+231ei7Fi/GLFcpQ11yipAxdStzSVko7OYuzzhhuEsBmhJ+u4wdDVLe7wAJ8g
+  6JD94CQSFfmasGHyhrdGOCJH65Oyir0yqvyVV6tu7VowmLQnuzbCe65EVA==
   -----END CERTIFICATE-----
 imageContentSources:
 - mirrors:
-  - okd4-services.okd.local:5000/okd4/okd45
+  - bastion.okd.local:5000/okd4/okd45
   source: quay.io/openshift/okd
 - mirrors:
-  - okd4-services.okd.local:5000/okd4/okd45
+  - bastion.okd.local:5000/okd4/okd45
   source: quay.io/openshift/okd-content
 
 
 openshift-install create manifests --dir=install_dir/
+
+# 調整成 Control-Plane-Node 不能佈署
+vi install_dir/manifests/cluster-scheduler-02-config.yml
 
 openshift-install create ignition-configs --dir=install_dir/
 
@@ -208,7 +223,7 @@ sudo firewall-cmd --permanent --add-service=https
 sudo firewall-cmd --permanent --add-port=80/tcp
 sudo firewall-cmd --reload
 
-curl http://okd4-services.okd.local:8080/okd4/metadata.json
+curl http://bastion.okd.local/okd4/metadata.json
 
 ---
 
@@ -219,16 +234,26 @@ sudo nmtui
 curl -LO http://bastion.lab.okd.local/okd4/bootstrap.ign
 coreos-installer install /dev/sda --firstboot-args=console=foo -n -i bootstrap.ign
 
+# 安裝完成，重啟伺服器 sudo reboot
+
+coreos.inst.install_dev=/dev/sda 
+coreos.inst.ignition_url=http://192.168.104.130/okd4/bootstrap.ign
+ip=192.168.104.132::192.168.104.2:255.255.255.0:bookstrap.lab.okd.local:ens33:none
+nameserver=192.168.104.130
 
 ---
 
 # Bootstrap Node
+# 可透過 Bastion Server SSH 到 Bootstrap
+ssh core@bootstrap.lab.okd.local
 
 journalctl -b -f -u kubelet.service
 journalctl -b -f -u bootkube.service
 
+# 安裝過程式重啟，重啟後才可使用 crictl 指令
 sudo crictl pods
-如果有很多服務，則可繼續安裝 control-plane-node
+
+# 如果有很多服務，則可繼續安裝 control-plane-node
 
 # 在 Bastion Server 執行以下指令等待安裝完成
 
